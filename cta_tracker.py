@@ -115,7 +115,7 @@ def getStations():
         # Assuming cta_sodapy3_api_key is defined in a previous cell
         # Unauthenticated client.
         client = Socrata("data.cityofchicago.org", cta_sodapy3_api_key)
-        station_results = client.get("3tzw-cg4m", limit=2000)
+        station_results = client.get("8pix-ypme", limit=2000)
         print("CTA train station data fetched successfully.")
     except NameError:
         print("Error: cta_sodapy3_api_key is not defined. Please ensure the cell defining cta_sodapy3_api_key is run.")
@@ -127,6 +127,10 @@ def getStations():
     # Check if station_results is not None or empty
     if not station_results:
         print("Station results is empty or None, cannot proceed.")
+    else:
+        print("Station data headers:", list(station_results[0].keys()))
+
+    
 
     return station_results
 
@@ -398,7 +402,9 @@ def plotRoutesAndStations(m):
     plotted_stations = set()
     # Plot Yellow Line stations
     if new_station_results:
+        # print("Plotting Yellow Line stations...")
         for station in new_station_results:
+            print("Processing station:", station.get('station_name'))
             map_id = station.get('map_id')
             # Check if the station is on the Yellow Line and hasn't been plotted yet
             if (station.get('y') == True or station.get('y') == 'true') and map_id not in plotted_stations:
@@ -418,6 +424,7 @@ def plotRoutesAndStations(m):
                         tooltip=station.get('station_name')
                     ).add_to(m)
                     plotted_stations.add(map_id) # Add map_id to the set of plotted stations
+                    print(f"Plotted Yellow Line station: {station.get('station_name')}")
                 except (ValueError, TypeError):
                     print(f"Skipping Yellow Line station due to invalid location data: {station.get('station_name')}")
     print("Yellow Line stations added to the map.")
