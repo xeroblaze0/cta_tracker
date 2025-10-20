@@ -37,6 +37,7 @@ line_colors = {
         'stations': [],
         'runs': [],
         'feature_group': FeatureGroup(name='Red Line'),
+        'train_feature_group': FeatureGroup(name='Red Line Trains'),
         'line_color': '#c60c30',
         'offset_lon': 0.0001,
         'offset_lat': 0.0001
@@ -49,6 +50,7 @@ line_colors = {
         'geometries': [],
         'runs': [],
         'feature_group': FeatureGroup(name='Blue Line'),
+        'train_feature_group': FeatureGroup(name='Blue Line Trains'),
         'line_color': '#00a1de',
         'offset_lon': 0.0,
         'offset_lat': 0.0
@@ -61,6 +63,7 @@ line_colors = {
         'geometries': [],
         'runs': [],
         'feature_group': FeatureGroup(name='Brown Line'),
+        'train_feature_group': FeatureGroup(name='Brown Line Trains'),
         'line_color': '#62361b',
         'offset_lon': -0.0001,
         'offset_lat': -0.0001
@@ -73,6 +76,7 @@ line_colors = {
         'geometries': [],
         'runs': [],
         'feature_group': FeatureGroup(name='Green Line'),
+        'train_feature_group': FeatureGroup(name='Green Line Trains'),
         'line_color': '#009b3a',
         'offset_lon': 0.0002,
         'offset_lat': 0.0002
@@ -85,6 +89,7 @@ line_colors = {
         'geometries': [],
         'runs': [],
         'feature_group': FeatureGroup(name='Orange Line'),
+        'train_feature_group': FeatureGroup(name='Orange Line Trains'),
         'line_color': '#f9461c',
         'offset_lon': -0.0002,
         'offset_lat': -0.0002
@@ -97,6 +102,7 @@ line_colors = {
         'geometries': [],
         'runs': [],
         'feature_group': FeatureGroup(name='Purple Line'),
+        'train_feature_group': FeatureGroup(name='Purple Line Trains'),
         'line_color': '#522398',
         'offset_lon': 0.0,
         'offset_lat': 0.0
@@ -109,6 +115,7 @@ line_colors = {
         'geometries': [],
         'runs': [],
         'feature_group': FeatureGroup(name='Pink Line'),
+        'train_feature_group': FeatureGroup(name='Pink Line Trains'),
         'line_color': '#e27ea6',
         'offset_lon': 0.0001,
         'offset_lat': 0.0001
@@ -121,6 +128,7 @@ line_colors = {
         'geometries': [],
         'runs': [],
         'feature_group': FeatureGroup(name='Yellow Line'),
+        'train_feature_group': FeatureGroup(name='Yellow Line Trains'),
         'line_color': '#f9e300',
         'offset_lon': -0.0001,
         'offset_lat': 0.0
@@ -243,7 +251,7 @@ def getStations():
                         line_details['stations'].append(station)
 
 def plotRuns(m, line_details):
-    line_group = line_details['feature_group']
+    train_line_group = line_details['train_feature_group']
     trains_list = line_details.get('runs', [])
 
     for train in trains_list:
@@ -267,7 +275,7 @@ def plotRuns(m, line_details):
                 icon_anchor=(11,20),
                 html=html),
             tooltip=f"Run {train.get('rn')}"
-        ).add_to(line_group)
+        ).add_to(train_line_group)
 
     return m
 
@@ -332,7 +340,26 @@ def plotTrainLine(m, line_details):
     # print(f"{line_details['legend']} stations added to the map.")
 
     # Add FeatureGroup to map
-    line_group.add_to(m)
+    # line_group.add_to(m)
+    # train_line_group = line_details['train_feature_group']
+    # train_line_group.add_to(m)
+
+    return m
+
+def createCombinedFeatureGroups(m):
+    """
+    Creates parent FeatureGroup objects for all train lines and trains,
+    and adds the individual line and train FeatureGroups to them.
+    """
+    all_lines_group = FeatureGroup(name='All Lines', show=True)
+    all_trains_group = FeatureGroup(name='All Trains', show=True)
+
+    for line_details in line_colors.values():
+        line_details['feature_group'].add_to(all_lines_group)
+        line_details['train_feature_group'].add_to(all_trains_group)
+
+    all_lines_group.add_to(m)
+    all_trains_group.add_to(m)
 
     return m
 
@@ -358,10 +385,13 @@ def main():
     map_file = "map.html"
     
     m = createCity()
+    
     getRuns()
 
     for line_details in line_colors.values():
         m = plotRuns(m, line_details)
+
+    m = createCombinedFeatureGroups(m)
 
     LayerControl().add_to(m)
     m.save(map_file)
