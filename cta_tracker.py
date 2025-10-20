@@ -7,6 +7,11 @@ import requests
 import webview
 import os
 
+import http.server
+import socketserver
+import webbrowser
+import threading
+
 from datetime import datetime as dt
 
 from IPython.display import Image
@@ -26,6 +31,9 @@ follow_url = 'https://lapi.transitchicago.com/api/1.0/ttfollow.aspx'
 arrivals_url = 'http://lapi.transitchicago.com/api/1.0/ttarrivals.aspx'
 positions_url = 'http://lapi.transitchicago.com/api/1.0/ttpositions.aspx'
 cta_soda3_api_endpoint_url='https://data.cityofchicago.org/api/v3/views/xbyr-jnvx/query.geojson'
+
+icon_path_full = '/home/user/Projects/cta_tracker/assets/train-subway-solid-full.png'
+icon_path = 'assets/train-subway-solid-full-wht.png'
 
 line_colors = {
     'Red Line': {
@@ -131,7 +139,7 @@ line_colors = {
         'train_feature_group': FeatureGroup(name='Yellow Line Trains'),
         'line_color': '#f9e300',
         'offset_lon': -0.0001,
-        'offset_lat': 0.0
+        'offset_lat': -0.0001
     }
 }
 
@@ -253,28 +261,48 @@ def getStations():
 def plotRuns(m, line_details):
     train_line_group = line_details['train_feature_group']
     trains_list = line_details.get('runs', [])
+    line_color = line_details.get('line_color', 'blue')
+    offset_lon = line_details.get('offset_lon', 0.0)
+    offset_lat = line_details.get('offset_lat', 0.0)
 
     for train in trains_list:
         lat = train.get('lat')
         lon = train.get('lon')
-        heading = train.get('heading')
-        
         if lat is None or lon is None:
             continue
+        try:
+            lat = float(lat)
+            lon = float(lon)
+        except (ValueError, TypeError):
+            continue
+        # Apply the same offset as the line
+        offset_latitude = lat + offset_lat
+        offset_longitude = lon + offset_lon
 
-        html = f'''
-        <span class="fa-stack" style="background-color: transparent; border: none;">
-            <i class="fa-solid fa-location-pin fa-2x fa-stack-1x" style="color:Tomato; transform: rotate({heading}deg);"></i>
-            <i class="fa-solid fa-train-subway fa-stack-1x" style="color:White"></i>
-        </span>
-        '''
+        # Add colored circle background
+        folium.CircleMarker(
+            location=[offset_latitude, offset_longitude],
+            radius=10,
+            color=line_color,
+            fill=True,
+            fill_color=line_color,
+            fill_opacity=1.0,
+            weight=2,
+            tooltip=None  # Tooltip will be on the icon
+        ).add_to(train_line_group)
+
+        # Add train icon marker on top
+        icon=folium.CustomIcon(
+            icon_path,
+            icon_size=(16, 16))
 
         folium.Marker(
-            (lat, lon),
-            icon=folium.DivIcon(
-                icon_anchor=(11,20),
-                html=html),
-            tooltip=f"Run {train.get('rn')}"
+            location=[offset_latitude, offset_longitude],
+            icon=icon,
+            tooltip=folium.Tooltip(
+            f"Direction: {train.get('destNm', '')}<br>"
+            f"Next Stop: {train.get('nextStaNm', '')}" if train.get('nextStaNm') else f"Direction: {train.get('destNm', '')}"
+            )
         ).add_to(train_line_group)
 
     return m
