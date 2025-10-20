@@ -32,9 +32,10 @@ line_colors = {
         'legend': 'Red Line',
         'color_id': '#c60c30',
         'lines': ['Red Line', 'Red'],
-        'l_stop_boolean': ['red'],
+        'rt': ['red'],
         'geometries': [],
         'stations': [],
+        'runs': [],
         'feature_group': FeatureGroup(name='Red Line'),
         'line_color': '#c60c30',
         'offset_lon': 0.0001,
@@ -44,8 +45,9 @@ line_colors = {
         'legend': 'Blue Line',
         'color_id': '#00a1de',
         'lines': ['Blue Line', 'Blue Line (O\'Hare)', 'Blue Line (Forest Park)', 'Blue'],
-        'l_stop_boolean': ['blue'],
+        'rt': ['blue'],
         'geometries': [],
+        'runs': [],
         'feature_group': FeatureGroup(name='Blue Line'),
         'line_color': '#00a1de',
         'offset_lon': 0.0,
@@ -55,8 +57,9 @@ line_colors = {
         'legend': 'Brown Line',
         'color_id': '#62361b',
         'lines': ['Brown Line', 'Brown'],
-        'l_stop_boolean': ['brn'],
+        'rt': ['brn'],
         'geometries': [],
+        'runs': [],
         'feature_group': FeatureGroup(name='Brown Line'),
         'line_color': '#62361b',
         'offset_lon': -0.0001,
@@ -66,8 +69,9 @@ line_colors = {
         'legend': 'Green Line',
         'color_id': '#009b3a',
         'lines': ['Green Line', 'Green'],
-        'l_stop_boolean': ['g'],
+        'rt': ['g'],
         'geometries': [],
+        'runs': [],
         'feature_group': FeatureGroup(name='Green Line'),
         'line_color': '#009b3a',
         'offset_lon': 0.0002,
@@ -77,8 +81,9 @@ line_colors = {
         'legend': 'Orange Line',
         'color_id': '#f9461c',
         'lines': ['Orange Line', 'Orange'],
-        'l_stop_boolean': ['o'],
+        'rt': ['o'],
         'geometries': [],
+        'runs': [],
         'feature_group': FeatureGroup(name='Orange Line'),
         'line_color': '#f9461c',
         'offset_lon': -0.0002,
@@ -88,8 +93,9 @@ line_colors = {
         'legend': 'Purple Line',
         'color_id': '#522398',
         'lines': ['Purple Line', 'Purple', 'Purple (Express)', 'Purple (Exp)'],
-        'l_stop_boolean': ['p', 'pexp'],
+        'rt': ['p', 'pexp'],
         'geometries': [],
+        'runs': [],
         'feature_group': FeatureGroup(name='Purple Line'),
         'line_color': '#522398',
         'offset_lon': 0.0,
@@ -99,8 +105,9 @@ line_colors = {
         'legend': 'Pink Line',
         'color_id': '#e27ea6',
         'lines': ['Pink Line', 'Pink'],
-        'l_stop_boolean': ['pnk'],
+        'rt': ['pnk'],
         'geometries': [],
+        'runs': [],
         'feature_group': FeatureGroup(name='Pink Line'),
         'line_color': '#e27ea6',
         'offset_lon': 0.0001,
@@ -110,8 +117,9 @@ line_colors = {
         'legend': 'Yellow Line',
         'color_id': '#f9e300',
         'lines': ['Yellow Line', 'Yellow'],
-        'l_stop_boolean': ['y'],
+        'rt': ['y'],
         'geometries': [],
+        'runs': [],
         'feature_group': FeatureGroup(name='Yellow Line'),
         'line_color': '#f9e300',
         'offset_lon': -0.0001,
@@ -168,31 +176,41 @@ def getRoutes():
     #     if isinstance(line_details, dict):
     #         print(f"Found {len(line_details['geometries'])} geometries for the {line_details['legend']}.")
 
-def getRuns(rt):
+def getRuns():
     # rt is route color, e.g. "RED", "BLUE", "G", "P", "Y", "BR", "P"
-    # returuns list of run numbers for that line
+    # returns list of run numbers for that line
 
-    params = {
-        "key": cta_api_key,
-        "rt": rt,
-        "outputType": "JSON"
-    }
-    
-    try:
-        response = requests.get(positions_url, params=params)
-        response.raise_for_status()  # Raise an HTTPError for bad responses (4xx or 5xx)
-        data = response.json()  # Or response.text for non-JSON responses
+    # Iterate through each line in line_colors
+    for line_name, line_details in line_colors.items():
+        # Clear existing runs before populating
+        line_details['runs'] = []
+        
+        # Iterate through the route identifiers for the current line
+        for rt_code in line_details['rt']:
+            params = {
+                "key": cta_api_key,
+                "rt": rt_code,
+                "outputType": "JSON"
+            }
+            
+            try:
+                response = requests.get(positions_url, params=params)
+                response.raise_for_status()  # Raise an HTTPError for bad responses
+                data = response.json()
 
-        # Process the data
-        # print(data)
+                # Check if 'route' exists and is not empty
+                if 'ctatt' in data and 'route' in data['ctatt'] and data['ctatt']['route']:
+                    # The 'train' key might not exist if there are no trains on the route
+                    trains_list = data['ctatt']['route'][0].get('train', [])
+                    if trains_list:
+                        line_details['runs'].extend(trains_list)
 
-    except requests.exceptions.RequestException as e:
-        print(f"Error making API request: {e}")
+            except requests.exceptions.RequestException as e:
+                print(f"Error making API request for {rt_code}: {e}")
+            except (KeyError, IndexError) as e:
+                # This can happen if a route has no trains, API returns different structure
+                print(f"No train data or unexpected format for route {rt_code}.")
 
-    trains_list = data['ctatt']['route'][0]['train']
-
-    # print(runs)
-    return trains_list
 
 def getStations():
 
@@ -221,46 +239,37 @@ def getStations():
         for station in station_results:
             for line_name, line_details in line_colors.items():
                 if isinstance(line_details, dict):
-                    if any(str(station.get(l_stop, '')).lower() in ['true', '1'] for l_stop in line_details['l_stop_boolean']):
+                    if any(str(station.get(l_stop, '')).lower() in ['true', '1'] for l_stop in line_details['rt']):
                         line_details['stations'].append(station)
-    
-    # for line_name, line_details in line_colors.items():
-    #     if isinstance(line_details, dict):
-    #         print(f"Found {len(line_details['stations'])} stations for the {line_details['legend']}.")
 
-def plotRuns(map, line):
-
-    runs = []
-    lats = []
-    longs = []
-    headings = []
-
-    trains_list=getRuns(line)
+def plotRuns(m, line_details):
+    line_group = line_details['feature_group']
+    trains_list = line_details.get('runs', [])
 
     for train in trains_list:
-
-        runs.append(train.get('rn'))
-        lats.append(train.get('lat'))
-        longs.append(train.get('lon'))
-        headings.append(train.get('heading'))
-
-    for i in range(len(runs)):
+        lat = train.get('lat')
+        lon = train.get('lon')
+        heading = train.get('heading')
+        
+        if lat is None or lon is None:
+            continue
 
         html = f'''
         <span class="fa-stack" style="background-color: transparent; border: none;">
-            <i class="fa-solid fa-location-pin fa-2x fa-stack-1x" style="color:Tomato; transform: rotate({headings[i]}deg);"></i>
+            <i class="fa-solid fa-location-pin fa-2x fa-stack-1x" style="color:Tomato; transform: rotate({heading}deg);"></i>
             <i class="fa-solid fa-train-subway fa-stack-1x" style="color:White"></i>
         </span>
         '''
 
         folium.Marker(
-            (lats[i], longs[i]),
+            (lat, lon),
             icon=folium.DivIcon(
                 icon_anchor=(11,20),
-                html=html)
-        ).add_to(map)
+                html=html),
+            tooltip=f"Run {train.get('rn')}"
+        ).add_to(line_group)
 
-    return map
+    return m
 
 def plotTrainLine(m, line_details):
 
@@ -349,7 +358,10 @@ def main():
     map_file = "map.html"
     
     m = createCity()
-    # m = plotRuns(m, "RED")
+    getRuns()
+
+    for line_details in line_colors.values():
+        m = plotRuns(m, line_details)
 
     LayerControl().add_to(m)
     m.save(map_file)
