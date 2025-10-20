@@ -339,14 +339,8 @@ def createCity():
     getRoutes() # Fetch and process all routes once
     getStations() # Fetch and process all stations once
     
-    m = plotTrainLine(m, line_colors['Red Line'])
-    m = plotTrainLine(m, line_colors['Blue Line'])
-    m = plotTrainLine(m, line_colors['Purple Line'])
-    m = plotTrainLine(m, line_colors['Brown Line'])
-    m = plotTrainLine(m, line_colors['Yellow Line'])
-    m = plotTrainLine(m, line_colors['Green Line'])
-    m = plotTrainLine(m, line_colors['Orange Line'])
-    m = plotTrainLine(m, line_colors['Pink Line'])
+    for line_details in line_colors.values():
+        m = plotTrainLine(m, line_details)
     
     return m
 
