@@ -14,6 +14,8 @@ from IPython.display import HTML
 
 import folium
 import folium.plugins as plugins
+from folium.features import FeatureGroup
+from folium import LayerControl
 
 from sodapy import Socrata # Ensure Socrata is imported if fetching data here
 
@@ -25,31 +27,96 @@ arrivals_url = 'http://lapi.transitchicago.com/api/1.0/ttarrivals.aspx'
 positions_url = 'http://lapi.transitchicago.com/api/1.0/ttpositions.aspx'
 cta_soda3_api_endpoint_url='https://data.cityofchicago.org/api/v3/views/xbyr-jnvx/query.geojson'
 
-# Define line_colors dictionary within this cell
 line_colors = {
-    'Red Line': 'c60c30',
-    'Red': 'c60c30',
-    'Blue Line': '00a1de',
-    'Blue Line (O\'Hare)': '00a1de',
-    'Blue Line (Forest Park)': '00a1de',
-    'Blue': '00a1de',
-    'Brown Line': '62361b',
-    'Brown': '62361b',
-    'Green Line': '009b3a',
-    'Green': '009b3a',
-    'Orange Line': 'f9461c',
-    'Orange': 'f9461c',
-    'Purple Line': '522398',
-    'Purple': '522398',
-    'Purple Line (Express)': '522398',
-    'Purple (Express)': '522398',
-    'Purple Line (Exp)': '522398',
-    'Purple (Exp)': '522398',
-    'Purple': '522398',
-    'Pink Line': 'e27ea6',
-    'Pink': 'e27ea6',
-    'Yellow Line': 'f9e300',
-    'Yellow': 'f9e300'
+    'Red Line': {
+        'legend': 'Red Line',
+        'color_id': '#c60c30',
+        'lines': ['Red Line', 'Red'],
+        'l_stop_boolean': ['red'],
+        'geometries': [],
+        'stations': [],
+        'feature_group': FeatureGroup(name='Red Line'),
+        'line_color': '#c60c30',
+        'offset_lon': 0.0001,
+        'offset_lat': 0.0001
+    },
+    'Blue Line': {
+        'legend': 'Blue Line',
+        'color_id': '#00a1de',
+        'lines': ['Blue Line', 'Blue Line (O\'Hare)', 'Blue Line (Forest Park)', 'Blue'],
+        'l_stop_boolean': ['blue'],
+        'geometries': [],
+        'feature_group': FeatureGroup(name='Blue Line'),
+        'line_color': '#00a1de',
+        'offset_lon': 0.0,
+        'offset_lat': 0.0
+    },
+    'Brown Line': {
+        'legend': 'Brown Line',
+        'color_id': '#62361b',
+        'lines': ['Brown Line', 'Brown'],
+        'l_stop_boolean': ['brn'],
+        'geometries': [],
+        'feature_group': FeatureGroup(name='Brown Line'),
+        'line_color': '#62361b',
+        'offset_lon': -0.0001,
+        'offset_lat': -0.0001
+    },
+    'Green Line': {
+        'legend': 'Green Line',
+        'color_id': '#009b3a',
+        'lines': ['Green Line', 'Green'],
+        'l_stop_boolean': ['g'],
+        'geometries': [],
+        'feature_group': FeatureGroup(name='Green Line'),
+        'line_color': '#009b3a',
+        'offset_lon': 0.0002,
+        'offset_lat': 0.0002
+    },
+    'Orange Line': {
+        'legend': 'Orange Line',
+        'color_id': '#f9461c',
+        'lines': ['Orange Line', 'Orange'],
+        'l_stop_boolean': ['o'],
+        'geometries': [],
+        'feature_group': FeatureGroup(name='Orange Line'),
+        'line_color': '#f9461c',
+        'offset_lon': -0.0002,
+        'offset_lat': -0.0002
+    },
+    'Purple Line': {
+        'legend': 'Purple Line',
+        'color_id': '#522398',
+        'lines': ['Purple Line', 'Purple', 'Purple (Express)', 'Purple (Exp)'],
+        'l_stop_boolean': ['p', 'pexp'],
+        'geometries': [],
+        'feature_group': FeatureGroup(name='Purple Line'),
+        'line_color': '#522398',
+        'offset_lon': 0.0,
+        'offset_lat': 0.0
+    },
+    'Pink Line': {
+        'legend': 'Pink Line',
+        'color_id': '#e27ea6',
+        'lines': ['Pink Line', 'Pink'],
+        'l_stop_boolean': ['pnk'],
+        'geometries': [],
+        'feature_group': FeatureGroup(name='Pink Line'),
+        'line_color': '#e27ea6',
+        'offset_lon': 0.0001,
+        'offset_lat': 0.0001
+    },
+    'Yellow Line': {
+        'legend': 'Yellow Line',
+        'color_id': '#f9e300',
+        'lines': ['Yellow Line', 'Yellow'],
+        'l_stop_boolean': ['y'],
+        'geometries': [],
+        'feature_group': FeatureGroup(name='Yellow Line'),
+        'line_color': '#f9e300',
+        'offset_lon': -0.0001,
+        'offset_lat': 0.0
+    }
 }
 
 def offset_coordinates(coords, offset_amount_degrees_lon=0.0, offset_amount_degrees_lat=0.0):
@@ -65,23 +132,41 @@ def offset_coordinates(coords, offset_amount_degrees_lon=0.0, offset_amount_degr
 
 def getRoutes():
 
-    print("Fetching route geometries from Socrata...")
+    print("Fetching and processing all route geometries from CTA...")
 
     # --- Data Fetching ---
     try:
-        # Assuming cta_sodapy3_api_key is defined in a previous cell
-        # Unauthenticated client.
         client = Socrata("data.cityofchicago.org", cta_sodapy3_api_key)
         results = client.get("xbyr-jnvx", limit=2000)
-        print("Data fetched successfully.")
+        # print("Data fetched successfully.")
     except NameError:
-        print("Error: cta_sodapy3_api_key is not defined. Please ensure the cell defining cta_sodapy3_api_key is run.")
-        results = None # Set results to None if cta_sodapy3_api_key is not defined
+        print("Error: cta_sodapy3_api_key is not defined.")
+        return
     except Exception as e:
         print(f"Error fetching data: {e}")
-        results = None
+        return
 
-    return results
+    if not results:
+        print("No route data returned from API.")
+        return
+
+    # Clear existing geometries before populating
+    for line in line_colors:
+        if isinstance(line_colors[line], dict):
+            line_colors[line]['geometries'] = []
+
+    # Iterate through results and assign geometries to the correct line
+    for item in results:
+        if isinstance(item, dict) and 'the_geom' in item and isinstance(item['the_geom'], dict):
+            for line_name, line_details in line_colors.items():
+                if isinstance(line_details, dict):
+                    # if 'legend' in item and item.get('legend') == line_details['legend']:
+                    if 'lines' in item and any(line_id in item.get('lines', '') for line_id in line_details['lines']):
+                        line_details['geometries'].append(item['the_geom'])
+
+    # for line_name, line_details in line_colors.items():
+    #     if isinstance(line_details, dict):
+    #         print(f"Found {len(line_details['geometries'])} geometries for the {line_details['legend']}.")
 
 def getRuns(rt):
     # rt is route color, e.g. "RED", "BLUE", "G", "P", "Y", "BR", "P"
@@ -110,523 +195,38 @@ def getRuns(rt):
     return trains_list
 
 def getStations():
+
+    print("Fetching and processing all station" \
+    " geometries from CTA...")
     # --- Data Fetching ---
     try:
-        # Assuming cta_sodapy3_api_key is defined in a previous cell
         # Unauthenticated client.
+        # https://data.cityofchicago.org/Transportation/CTA-System-Information-List-of-L-Stops/8pix-ypme/about_data
         client = Socrata("data.cityofchicago.org", cta_sodapy3_api_key)
         station_results = client.get("8pix-ypme", limit=2000)
-        print("CTA train station data fetched successfully.")
+        # print("CTA train station data fetched successfully.")
     except NameError:
         print("Error: cta_sodapy3_api_key is not defined. Please ensure the cell defining cta_sodapy3_api_key is run.")
-        station_results = None # Set results to None if cta_sodapy3_api_key is not defined
+        return
     except Exception as e:
         print(f"Error fetching data: {e}")
-        station_results = None
+        return
 
-    # Check if station_results is not None or empty
-    if not station_results:
-        print("Station results is empty or None, cannot proceed.")
-    else:
-        print("Station data headers:", list(station_results[0].keys()))
+    # Clear existing stations before populating
+    for line in line_colors:
+        if isinstance(line_colors[line], dict):
+            line_colors[line]['stations'] = []
 
+    if station_results:
+        for station in station_results:
+            for line_name, line_details in line_colors.items():
+                if isinstance(line_details, dict):
+                    if any(str(station.get(l_stop, '')).lower() in ['true', '1'] for l_stop in line_details['l_stop_boolean']):
+                        line_details['stations'].append(station)
     
-
-    return station_results
-
-def plotRoutesAndStations(m):
-
-    print("Plotting route geometries on the map...")
-
-    results = getRoutes()
-    new_station_results = getStations()
-
-    brown_line_geometries = []
-    orange_line_geometries = []
-    green_line_geometries = []
-    pink_line_geometries = []
-    purple_line_geometries = []
-    blue_line_geometries = []
-    red_line_geometries = []
-    yellow_line_geometries = []
-
-    red_line_color = '#' + line_colors.get('Red Line', 'c60c30')
-    blue_line_color = '#' + line_colors.get('Blue Line', '00a1de')
-    yellow_line_color = '#' + line_colors.get('Yellow Line', 'f9e300')
-    purple_line_color = '#' + line_colors.get('Purple Line', '522398')
-    brown_line_color = '#' + line_colors.get('Brown Line', '62361b')
-    green_line_color = '#' + line_colors.get('Green Line', '009b3a')
-    orange_line_color = '#' + line_colors.get('Orange Line', 'f9461c')
-    pink_line_color = '#' + line_colors.get('Pink Line', 'e27ea6')
-
-    red_offset_lon = 0.0001
-    red_offset_lat = 0.0001
-    blue_offset_lon = 0.0000
-    blue_offset_lat = 0.0000
-    yellow_offset_lon = -0.0001
-    yellow_offset_lat = 0.0000
-    purple_offset_lon = 0.0000
-    purple_offset_lat = -0.0000
-    brown_offset_lon = -0.0001
-    brown_offset_lat = -0.0001
-    green_offset_lon = 0.0002
-    green_offset_lat = 0.0002
-    orange_offset_lon = -0.0002
-    orange_offset_lat = -0.0002
-    pink_offset_lon = 0.0001
-    pink_offset_lat = 0.0001
-
-    if results:
-        for item in results:
-            if isinstance(item, dict) and 'the_geom' in item and isinstance(item['the_geom'], dict):
-                # Check for Brown Line
-                if ('legend' in item and item.get('legend') == 'BR') or \
-                ('lines' in item and 'brown' in item.get('lines', '').lower()):
-                    brown_line_geometries.append(item['the_geom'])
-
-                # Check for Orange Line
-                if ('legend' in item and item.get('legend') == 'OR') or \
-                ('lines' in item and 'orange' in item.get('lines', '').lower()):
-                    orange_line_geometries.append(item['the_geom'])
-
-                # Check for Green Line
-                if ('legend' in item and item.get('legend') == 'GR') or \
-                ('lines' in item and 'green' in item.get('lines', '').lower()):
-                    green_line_geometries.append(item['the_geom'])
-
-                # Check for Pink Line
-                if ('legend' in item and item.get('legend') == 'PK') or \
-                ('lines' in item and 'pink' in item.get('lines', '').lower()):
-                    pink_line_geometries.append(item['the_geom'])
-
-                # Check for Purple Line
-                if ('legend' in item and item.get('legend') == 'PR') or \
-                ('lines' in item and 'purple' in item.get('lines', '').lower()):
-                    purple_line_geometries.append(item['the_geom'])
-
-                # Check for Blue Line
-                if ('legend' in item and item.get('legend') == 'BL') or \
-                ('lines' in item and 'blue' in item.get('lines', '').lower()):
-                    blue_line_geometries.append(item['the_geom'])
-
-                # Check for Red Line
-                if ('legend' in item and item.get('legend') == 'RD') or \
-                ('lines' in item and 'red' in item.get('lines', '').lower()):
-                    red_line_geometries.append(item['the_geom'])
-
-                # Check for Yellow Line
-                if ('legend' in item and item.get('legend') == 'YL') or \
-                ('lines' in item and 'yellow' in item.get('lines', '').lower()):
-                    yellow_line_geometries.append(item['the_geom'])
-
-        print(f"Found {len(brown_line_geometries)} geometries for the Brown Line.")
-        print(f"Found {len(orange_line_geometries)} geometries for the Orange Line.")
-        print(f"Found {len(green_line_geometries)} geometries for the Green Line.")
-        print(f"Found {len(pink_line_geometries)} geometries for the Pink Line.")
-        print(f"Found {len(purple_line_geometries)} geometries for the Purple Line.")
-        print(f"Found {len(blue_line_geometries)} geometries for the Blue Line.")
-        print(f"Found {len(red_line_geometries)} geometries for the Red Line.")
-        print(f"Found {len(yellow_line_geometries)} geometries for the Yellow Line.")
-    else:
-        print("Results is empty or None, cannot filter geometries.")
- 
-    # Plot Red Line with offset
-    if red_line_geometries:        
-        for geometry in red_line_geometries:
-            if geometry.get('type') == 'MultiLineString':
-                offset_multilinestring = []
-                for linestring_coords in geometry.get('coordinates', []):
-                    offset_multilinestring.append(offset_coordinates(linestring_coords, red_offset_lon, red_offset_lat))
-                offset_geometry = {'type': 'MultiLineString', 'coordinates': offset_multilinestring}
-                folium.features.GeoJson(
-                    offset_geometry,
-                    style_function=lambda x: {'color': red_line_color, 'weight': 3}
-                ).add_to(m)
-            elif geometry.get('type') == 'LineString':
-                offset_linestring = offset_coordinates(geometry.get('coordinates', []), red_offset_lon, red_offset_lat)
-                offset_geometry = {'type': 'LineString', 'coordinates': offset_linestring}
-                folium.features.GeoJson(
-                    offset_geometry,
-                    style_function=lambda x: {'color': red_line_color, 'weight': 3}
-                ).add_to(m)
-        print("Red Line geometries added to the map.")
-
-    # Plot Blue Line with offset
-    if blue_line_geometries:
-        for geometry in blue_line_geometries:
-            if geometry.get('type') == 'MultiLineString':
-                offset_multilinestring = []
-                for linestring_coords in geometry.get('coordinates', []):
-                    offset_multilinestring.append(offset_coordinates(linestring_coords, blue_offset_lon, blue_offset_lat))
-                offset_geometry = {'type': 'MultiLineString', 'coordinates': offset_multilinestring}
-                folium.features.GeoJson(
-                    offset_geometry,
-                    style_function=lambda x: {'color': blue_line_color, 'weight': 3}
-                ).add_to(m)
-            elif geometry.get('type') == 'LineString':
-                offset_linestring = offset_coordinates(geometry.get('coordinates', []), blue_offset_lon, blue_offset_lat)
-                offset_geometry = {'type': 'LineString', 'coordinates': offset_linestring}
-                folium.features.GeoJson(
-                    offset_geometry,
-                    style_function=lambda x: {'color': blue_line_color, 'weight': 3}
-                ).add_to(m)
-        print("Blue Line geometries added to the map.")
-
-    # Plot Yellow Line with offset
-    if yellow_line_geometries:
-        for geometry in yellow_line_geometries:
-            if geometry.get('type') == 'MultiLineString':
-                offset_multilinestring = []
-                for linestring_coords in geometry.get('coordinates', []):
-                    offset_multilinestring.append(offset_coordinates(linestring_coords, yellow_offset_lon, yellow_offset_lat))
-                offset_geometry = {'type': 'MultiLineString', 'coordinates': offset_multilinestring}
-                folium.features.GeoJson(
-                    offset_geometry,
-                    style_function=lambda x: {'color': yellow_line_color, 'weight': 3}
-                ).add_to(m)
-            elif geometry.get('type') == 'LineString':
-                offset_linestring = offset_coordinates(geometry.get('coordinates', []), yellow_offset_lon, yellow_offset_lat)
-                offset_geometry = {'type': 'LineString', 'coordinates': offset_linestring}
-                folium.features.GeoJson(
-                    offset_geometry,
-                    style_function=lambda x: {'color': yellow_line_color, 'weight': 3}
-                ).add_to(m)
-        print("Yellow Line geometries added to the map.")
-
-    # Plot Purple Line with offset and dashed style  
-    if purple_line_geometries:
-        for geometry in purple_line_geometries:
-            if geometry.get('type') == 'MultiLineString':
-                offset_multilinestring = []
-                for linestring_coords in geometry.get('coordinates', []):
-                    offset_multilinestring.append(offset_coordinates(linestring_coords, purple_offset_lon, purple_offset_lat))
-                offset_geometry = {'type': 'MultiLineString', 'coordinates': offset_multilinestring}
-                folium.features.GeoJson(
-                    offset_geometry,
-                    style_function=lambda x: {'color': purple_line_color, 'weight': 3, 'dashArray': '5, 5'}
-                ).add_to(m)
-            elif geometry.get('type') == 'LineString':
-                offset_linestring = offset_coordinates(geometry.get('coordinates', []), purple_offset_lon, purple_offset_lat)
-                offset_geometry = {'type': 'LineString', 'coordinates': offset_linestring}
-                folium.features.GeoJson(
-                    offset_geometry,
-                    style_function=lambda x: {'color': purple_line_color, 'weight': 3, 'dashArray': '5, 5'}
-                ).add_to(m)
-        print("Purple Line geometries added to the map as dashed lines.")
-
-    # Plot Brown Line with offset   
-    if brown_line_geometries:
-        for geometry in brown_line_geometries:
-            if geometry.get('type') == 'MultiLineString':
-                offset_multilinestring = []
-                for linestring_coords in geometry.get('coordinates', []):
-                    offset_multilinestring.append(offset_coordinates(linestring_coords, brown_offset_lon, brown_offset_lat))
-                offset_geometry = {'type': 'MultiLineString', 'coordinates': offset_multilinestring}
-                folium.features.GeoJson(
-                    offset_geometry,
-                    style_function=lambda x: {'color': brown_line_color, 'weight': 3}
-                ).add_to(m)
-            elif geometry.get('type') == 'LineString':
-                offset_linestring = offset_coordinates(geometry.get('coordinates', []), brown_offset_lon, brown_offset_lat)
-                offset_geometry = {'type': 'LineString', 'coordinates': offset_linestring}
-                folium.features.GeoJson(
-                    offset_geometry,
-                    style_function=lambda x: {'color': brown_line_color, 'weight': 3}
-                ).add_to(m)
-        print("Brown Line geometries added to the map.")
-
-    # Plot Green Line with offset
-    if green_line_geometries:
-        for geometry in green_line_geometries:
-            if geometry.get('type') == 'MultiLineString':
-                offset_multilinestring = []
-                for linestring_coords in geometry.get('coordinates', []):
-                    offset_multilinestring.append(offset_coordinates(linestring_coords, green_offset_lon, green_offset_lat))
-                offset_geometry = {'type': 'MultiLineString', 'coordinates': offset_multilinestring}
-                folium.features.GeoJson(
-                    offset_geometry,
-                    style_function=lambda x: {'color': green_line_color, 'weight': 3}
-                ).add_to(m)
-            elif geometry.get('type') == 'LineString':
-                offset_linestring = offset_coordinates(geometry.get('coordinates', []), green_offset_lon, green_offset_lat)
-                offset_geometry = {'type': 'LineString', 'coordinates': offset_linestring}
-                folium.features.GeoJson(
-                    offset_geometry,
-                    style_function=lambda x: {'color': green_line_color, 'weight': 3}
-                ).add_to(m)
-        print("Green Line geometries added to the map.")
-
-    # Plot Orange Line with offset
-    if orange_line_geometries:        
-        for geometry in orange_line_geometries:
-            if geometry.get('type') == 'MultiLineString':
-                offset_multilinestring = []
-                for linestring_coords in geometry.get('coordinates', []):
-                    offset_multilinestring.append(offset_coordinates(linestring_coords, orange_offset_lon, orange_offset_lat))
-                offset_geometry = {'type': 'MultiLineString', 'coordinates': offset_multilinestring}
-                folium.features.GeoJson(
-                    offset_geometry,
-                    style_function=lambda x: {'color': orange_line_color, 'weight': 3}
-                ).add_to(m)
-            elif geometry.get('type') == 'LineString':
-                offset_linestring = offset_coordinates(geometry.get('coordinates', []), orange_offset_lon, orange_offset_lat)
-                offset_geometry = {'type': 'LineString', 'coordinates': offset_linestring}
-                folium.features.GeoJson(
-                    offset_geometry,
-                    style_function=lambda x: {'color': orange_line_color, 'weight': 3}
-                ).add_to(m)
-        print("Orange Line geometries added to the map.")
-
-    # Plot Pink Line with offset
-    if pink_line_geometries:
-        for geometry in pink_line_geometries:
-            if geometry.get('type') == 'MultiLineString':
-                offset_multilinestring = []
-                for linestring_coords in geometry.get('coordinates', []):
-                    offset_multilinestring.append(offset_coordinates(linestring_coords, pink_offset_lon, pink_offset_lat))
-                offset_geometry = {'type': 'MultiLineString', 'coordinates': offset_multilinestring}
-                folium.features.GeoJson(
-                    offset_geometry,
-                    style_function=lambda x: {'color': pink_line_color, 'weight': 3}
-                ).add_to(m)
-            elif geometry.get('type') == 'LineString':
-                offset_linestring = offset_coordinates(geometry.get('coordinates', []), pink_offset_lon, pink_offset_lat)
-                offset_geometry = {'type': 'LineString', 'coordinates': offset_linestring}
-                folium.features.GeoJson(
-                    offset_geometry,
-                    style_function=lambda x: {'color': pink_line_color, 'weight': 3}
-                ).add_to(m)
-        print("Pink Line geometries added to the map.")
-
-    # Set to keep track of plotted stations by map_id
-    plotted_stations = set()
-    # Plot Yellow Line stations
-    if new_station_results:
-        # print("Plotting Yellow Line stations...")
-        for station in new_station_results:
-            print("Processing station:", station.get('station_name'))
-            map_id = station.get('map_id')
-            # Check if the station is on the Yellow Line and hasn't been plotted yet
-            if (station.get('y') == True or station.get('y') == 'true') and map_id not in plotted_stations:
-                try:
-                    latitude = float(station.get('location', {}).get('latitude'))
-                    longitude = float(station.get('location', {}).get('longitude'))
-                    # Apply the same offset as the Yellow Line geometries
-                    offset_latitude = latitude + yellow_offset_lat
-                    offset_longitude = longitude + yellow_offset_lon
-                    folium.CircleMarker(
-                        location=[offset_latitude, offset_longitude],
-                        radius=5,
-                        color=yellow_line_color,
-                        fill=True,
-                        fill_color='white',
-                        fill_opacity=1.0,
-                        tooltip=station.get('station_name')
-                    ).add_to(m)
-                    plotted_stations.add(map_id) # Add map_id to the set of plotted stations
-                    print(f"Plotted Yellow Line station: {station.get('station_name')}")
-                except (ValueError, TypeError):
-                    print(f"Skipping Yellow Line station due to invalid location data: {station.get('station_name')}")
-    print("Yellow Line stations added to the map.")
-
-    # Set to keep track of plotted stations by map_id
-    plotted_stations = set()
-    # Plot Red Line stations
-    if new_station_results:
-        for station in new_station_results:
-            map_id = station.get('map_id')
-            # Check if the station is on the Red Line and hasn't been plotted yet
-            if (station.get('red') == True or station.get('red') == 'true') and map_id not in plotted_stations:
-                try:
-                    latitude = float(station.get('location', {}).get('latitude'))
-                    longitude = float(station.get('location', {}).get('longitude'))
-                    # Apply the same offset as the Brown Line geometries
-                    offset_latitude = latitude + red_offset_lat
-                    offset_longitude = longitude + red_offset_lon
-                    folium.CircleMarker(
-                        location=[offset_latitude, offset_longitude],
-                        radius=5,
-                        color=red_line_color,
-                        fill=True,
-                        fill_color='white',
-                        fill_opacity=1.0,
-                        tooltip=station.get('station_name')
-                    ).add_to(m)
-                    plotted_stations.add(map_id) # Add map_id to the set of plotted stations
-                except (ValueError, TypeError):
-                    print(f"Skipping Red Line station due to invalid location data: {station.get('station_name')}")
-    print("Red Line stations added to the map.")
-
-    # Set to keep track of plotted stations by map_id
-    plotted_stations = set()
-    # Plot Purple Line stations
-    if new_station_results:
-        for station in new_station_results:
-            map_id = station.get('map_id')
-            # Check if the station is on the Purple Line and hasn't been plotted yet
-            if (station.get('p') == True or station.get('p') == 'true' or station.get('pexp') == True or station.get('pexp') == 'true') and map_id not in plotted_stations:
-                try:
-                    latitude = float(station.get('location', {}).get('latitude'))
-                    longitude = float(station.get('location', {}).get('longitude'))
-                    # Apply the same offset as the Purple Line geometries
-                    offset_latitude = latitude + purple_offset_lat
-                    offset_longitude = longitude + purple_offset_lon
-                    folium.CircleMarker(
-                        location=[offset_latitude, offset_longitude],
-                        radius=5,
-                        color=purple_line_color,
-                        fill=True,
-                        fill_color='white',
-                        fill_opacity=1.0,
-                        tooltip=station.get('station_name')
-                    ).add_to(m)
-                    plotted_stations.add(map_id) # Add map_id to the set of plotted stations
-                except (ValueError, TypeError):
-                    print(f"Skipping Purple Line station due to invalid location data: {station.get('station_name')}")
-    print("Purple Line stations added to the map.")
-
-    # Set to keep track of plotted stations by map_id
-    plotted_stations = set()
-    # Plot Brown Line stations
-    if new_station_results:
-        for station in new_station_results:
-            map_id = station.get('map_id')
-            # Check if the station is on the Brown Line and hasn't been plotted yet
-            if (station.get('brn') == True or station.get('brn') == 'true') and map_id not in plotted_stations:
-                try:
-                    latitude = float(station.get('location', {}).get('latitude'))
-                    longitude = float(station.get('location', {}).get('longitude'))
-                    # Apply the same offset as the Brown Line geometries
-                    offset_latitude = latitude + brown_offset_lat
-                    offset_longitude = longitude + brown_offset_lon
-                    folium.CircleMarker(
-                        location=[offset_latitude, offset_longitude],
-                        radius=5,
-                        color=brown_line_color,
-                        fill=True,
-                        fill_color='white',
-                        fill_opacity=1.0,
-                        tooltip=station.get('station_name')
-                    ).add_to(m)
-                    plotted_stations.add(map_id) # Add map_id to the set of plotted stations
-                except (ValueError, TypeError):
-                    print(f"Skipping Brown Line station due to invalid location data: {station.get('station_name')}")
-    print("Brown Line stations added to the map.")
-
-    # Set to keep track of plotted stations by map_id
-    plotted_stations = set()
-    # Plot Orange Line stations
-    if new_station_results:
-        for station in new_station_results:
-            map_id = station.get('map_id')
-            # Check if the station is on the Orange Line and hasn't been plotted yet
-            if (station.get('o') == True or station.get('o') == 'true') and map_id not in plotted_stations:
-                try:
-                    latitude = float(station.get('location', {}).get('latitude'))
-                    longitude = float(station.get('location', {}).get('longitude'))
-                    # Apply the same offset as the Orange Line geometries
-                    offset_latitude = latitude + orange_offset_lat
-                    offset_longitude = longitude + orange_offset_lon
-                    folium.CircleMarker(
-                        location=[offset_latitude, offset_longitude],
-                        radius=5,
-                        color=orange_line_color,
-                        fill=True,
-                        fill_color='white',
-                        fill_opacity=1.0,
-                        tooltip=station.get('station_name')
-                    ).add_to(m)
-                    plotted_stations.add(map_id) # Add map_id to the set of plotted stations
-                except (ValueError, TypeError):
-                    print(f"Skipping Orange Line station due to invalid location data: {station.get('station_name')}")
-    print("Orange Line stations added to the map.")
-
-    # Set to keep track of plotted stations by map_id
-    plotted_stations = set()
-    # Plot Green Line stations
-    if new_station_results:
-        for station in new_station_results:
-            map_id = station.get('map_id')
-            # Check if the station is on the Green Line and hasn't been plotted yet
-            if (station.get('g') == True or station.get('g') == 'true') and map_id not in plotted_stations:
-                try:
-                    latitude = float(station.get('location', {}).get('latitude'))
-                    longitude = float(station.get('location', {}).get('longitude'))
-                    # Apply the same offset as the Green Line geometries
-                    offset_latitude = latitude + green_offset_lat
-                    offset_longitude = longitude + green_offset_lon
-                    folium.CircleMarker(
-                        location=[offset_latitude, offset_longitude],
-                        radius=5,
-                        color=green_line_color,
-                        fill=True,
-                        fill_color='white',
-                        fill_opacity=1.0,
-                        tooltip=station.get('station_name')
-                    ).add_to(m)
-                    plotted_stations.add(map_id) # Add map_id to the set of plotted stations
-                except (ValueError, TypeError):
-                    print(f"Skipping Green Line station due to invalid location data: {station.get('station_name')}")
-    print("Green Line stations added to the map.")
-
-    # Set to keep track of plotted stations by map_id
-    plotted_stations = set()
-    # Plot Pink Line stations
-    if new_station_results:
-        for station in new_station_results:
-            map_id = station.get('map_id')
-            # Check if the station is on the Pink Line and hasn't been plotted yet
-            if (station.get('pnk') == True or station.get('pnk') == 'true') and map_id not in plotted_stations:
-                try:
-                    latitude = float(station.get('location', {}).get('latitude'))
-                    longitude = float(station.get('location', {}).get('longitude'))
-                    # Apply the same offset as the Pink Line geometries
-                    offset_latitude = latitude + pink_offset_lat
-                    offset_longitude = longitude + pink_offset_lon
-                    folium.CircleMarker(
-                        location=[offset_latitude, offset_longitude],
-                        radius=5,
-                        color=pink_line_color,
-                        fill=True,
-                        fill_color='white',
-                        fill_opacity=1.0,
-                        tooltip=station.get('station_name')
-                    ).add_to(m)
-                    plotted_stations.add(map_id) # Add map_id to the set of plotted stations
-                except (ValueError, TypeError):
-                    print(f"Skipping Pink Line station due to invalid location data: {station.get('station_name')}")
-    print("Pink Line stations added to the map.")
-
-    # Set to keep track of plotted stations by map_id
-    plotted_stations = set()
-    # Plot Blue Line stations
-    if new_station_results:
-        for station in new_station_results:
-            map_id = station.get('map_id')
-            # Check if the station is on the Blue Line and hasn't been plotted yet
-            if (station.get('blue') == True or station.get('blue') == 'true') and map_id not in plotted_stations:
-                try:
-                    latitude = float(station.get('location', {}).get('latitude'))
-                    longitude = float(station.get('location', {}).get('longitude'))
-                    # Apply the same offset as the Blue Line geometries
-                    offset_latitude = latitude + blue_offset_lat
-                    offset_longitude = longitude + blue_offset_lon
-                    folium.CircleMarker(
-                        location=[offset_latitude, offset_longitude],
-                        radius=5,
-                        color=blue_line_color,
-                        fill=True,
-                        fill_color='white',
-                        fill_opacity=1.0,
-                        tooltip=station.get('station_name')
-                    ).add_to(m)
-                    plotted_stations.add(map_id) # Add map_id to the set of plotted stations
-                except (ValueError, TypeError):
-                    print(f"Skipping Blue Line station due to invalid location data: {station.get('station_name')}")
-    print("Blue Line stations added to the map.")
-
-
-    return m
+    # for line_name, line_details in line_colors.items():
+    #     if isinstance(line_details, dict):
+    #         print(f"Found {len(line_details['stations'])} stations for the {line_details['legend']}.")
 
 def plotRuns(map, line):
 
@@ -662,6 +262,71 @@ def plotRuns(map, line):
 
     return map
 
+def plotTrainLine(m, line_details):
+
+    # print(f"Plotting {line_details['legend']} geometries on the map...")
+
+    line_geometries = line_details['geometries']
+    station_results = line_details['stations']
+
+    line_group = line_details['feature_group']
+    line_color = line_details['line_color']
+    offset_lon = line_details['offset_lon']
+    offset_lat = line_details['offset_lat']
+
+    if line_geometries:
+        for geometry in line_geometries:
+            if geometry.get('type') == 'MultiLineString':
+                offset_multilinestring = []
+                for linestring_coords in geometry.get('coordinates', []):
+                    offset_multilinestring.append(offset_coordinates(linestring_coords, offset_lon, offset_lat))
+                offset_geometry = {'type': 'MultiLineString', 'coordinates': offset_multilinestring}
+                folium.features.GeoJson(
+                    offset_geometry,
+                    style_function=lambda x, color=line_color: {'color': color, 'weight': 3}
+                ).add_to(line_group) # Add to FeatureGroup
+            elif geometry.get('type') == 'LineString':
+                offset_linestring = offset_coordinates(geometry.get('coordinates', []), offset_lon, offset_lat)
+                offset_geometry = {'type': 'LineString', 'coordinates': offset_linestring}
+                folium.features.GeoJson(
+                    offset_geometry,
+                    style_function=lambda x, color=line_color: {'color': color, 'weight': 3}
+                ).add_to(line_group) # Add to FeatureGroup
+        # print(f"{line_details['legend']} geometries added to the {line_details['legend']} FeatureGroup with offset.")
+
+    # Set to keep track of plotted stations by map_id
+    plotted_stations = set()
+    # Plot stations
+    if station_results:
+        for station in station_results:
+            map_id = station.get('map_id')
+            # Check if the station hasn't been plotted yet
+            if map_id not in plotted_stations:
+                try:
+                    latitude = float(station.get('location', {}).get('latitude'))
+                    longitude = float(station.get('location', {}).get('longitude'))
+                    # Apply the same offset as the line geometries
+                    offset_latitude = latitude + offset_lat
+                    offset_longitude = longitude + offset_lon
+                    folium.CircleMarker(
+                        location=[offset_latitude, offset_longitude],
+                        radius=5,
+                        color=line_color,
+                        fill=True,
+                        fill_color='white',
+                        fill_opacity=1.0,
+                        tooltip=station.get('station_name')
+                    ).add_to(line_group)
+                    plotted_stations.add(map_id) # Add map_id to the set of plotted stations
+                except (ValueError, TypeError):
+                    print(f"Skipping {line_details['legend']} station due to invalid location data: {station.get('station_name')}")
+    # print(f"{line_details['legend']} stations added to the map.")
+
+    # Add FeatureGroup to map
+    line_group.add_to(m)
+
+    return m
+
 def newMap():
 
     m = folium.Map(location=[41.8781, -87.6298], zoom_start=11, tiles='USGS.USImagery') # OpenStreetMap provides some aerial views, or consider 'Stamen Terrain' or 'Stamen Toner'
@@ -670,8 +335,18 @@ def newMap():
 def createCity():
 
     m = newMap()
-    # m = plotRuns(m, "RED")
-    m = plotRoutesAndStations(m)
+
+    getRoutes() # Fetch and process all routes once
+    getStations() # Fetch and process all stations once
+    
+    m = plotTrainLine(m, line_colors['Red Line'])
+    m = plotTrainLine(m, line_colors['Blue Line'])
+    m = plotTrainLine(m, line_colors['Purple Line'])
+    m = plotTrainLine(m, line_colors['Brown Line'])
+    m = plotTrainLine(m, line_colors['Yellow Line'])
+    m = plotTrainLine(m, line_colors['Green Line'])
+    m = plotTrainLine(m, line_colors['Orange Line'])
+    m = plotTrainLine(m, line_colors['Pink Line'])
     
     return m
 
@@ -682,6 +357,7 @@ def main():
     m = createCity()
     # m = plotRuns(m, "RED")
 
+    LayerControl().add_to(m)
     m.save(map_file)
     
     # Get absolute path and create a file URL
