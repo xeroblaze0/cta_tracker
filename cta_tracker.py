@@ -7,11 +7,6 @@ import requests
 import webview
 import os
 
-import http.server
-import socketserver
-import webbrowser
-import threading
-
 from datetime import datetime as dt
 
 from IPython.display import Image
@@ -32,8 +27,9 @@ arrivals_url = 'http://lapi.transitchicago.com/api/1.0/ttarrivals.aspx'
 positions_url = 'http://lapi.transitchicago.com/api/1.0/ttpositions.aspx'
 cta_soda3_api_endpoint_url='https://data.cityofchicago.org/api/v3/views/xbyr-jnvx/query.geojson'
 
-icon_path_full = '/home/user/Projects/cta_tracker/assets/train-subway-solid-full.png'
-icon_path = 'assets/train-subway-solid-full-wht.png'
+# icon_path_full = '/home/user/Projects/cta_tracker/assets/train-subway-solid-full.png'
+# icon_path = os.path.join(os.path.dirname(__file__), 'assets', 'train-subway-solid-full-wht.png')
+# loc_icon_path = os.path.join(os.path.dirname(__file__), 'assets', 'location-pin-solid-full.png')
 
 line_colors = {
     'Red Line': {
@@ -113,7 +109,8 @@ line_colors = {
         'train_feature_group': FeatureGroup(name='Purple Line Trains'),
         'line_color': '#522398',
         'offset_lon': 0.0,
-        'offset_lat': 0.0
+        'offset_lat': 0.0,
+        'dashed': True
     },
     'Pink Line': {
         'legend': 'Pink Line',
@@ -154,7 +151,7 @@ def offset_coordinates(coords, offset_amount_degrees_lon=0.0, offset_amount_degr
         offset_coords.append([coord_pair[0] + offset_amount_degrees_lon, coord_pair[1] + offset_amount_degrees_lat])
     return offset_coords
 
-def getRoutes():
+def getTrainRoutes():
 
     print("Fetching and processing all route geometries from CTA...")
 
@@ -192,7 +189,7 @@ def getRoutes():
     #     if isinstance(line_details, dict):
     #         print(f"Found {len(line_details['geometries'])} geometries for the {line_details['legend']}.")
 
-def getRuns():
+def getTrains():
     # rt is route color, e.g. "RED", "BLUE", "G", "P", "Y", "BR", "P"
     # returns list of run numbers for that line
 
@@ -227,8 +224,7 @@ def getRuns():
                 # This can happen if a route has no trains, API returns different structure
                 print(f"No train data or unexpected format for route {rt_code}.")
 
-
-def getStations():
+def getTrainStations():
 
     print("Fetching and processing all station" \
     " geometries from CTA...")
@@ -258,10 +254,10 @@ def getStations():
                     if any(str(station.get(l_stop, '')).lower() in ['true', '1'] for l_stop in line_details['rt']):
                         line_details['stations'].append(station)
 
-def plotRuns(m, line_details):
+def plotTrains(m, line_details):
     train_line_group = line_details['train_feature_group']
     trains_list = line_details.get('runs', [])
-    line_color = line_details.get('line_color', 'blue')
+    line_color = line_details.get('line_color', '#000000')
     offset_lon = line_details.get('offset_lon', 0.0)
     offset_lat = line_details.get('offset_lat', 0.0)
 
@@ -279,26 +275,24 @@ def plotRuns(m, line_details):
         offset_latitude = lat + offset_lat
         offset_longitude = lon + offset_lon
 
-        # Add colored circle background
-        folium.CircleMarker(
-            location=[offset_latitude, offset_longitude],
-            radius=10,
-            color=line_color,
-            fill=True,
-            fill_color=line_color,
-            fill_opacity=1.0,
-            weight=2,
-            tooltip=None  # Tooltip will be on the icon
-        ).add_to(train_line_group)
-
-        # Add train icon marker on top
-        icon=folium.CustomIcon(
-            icon_path,
-            icon_size=(16, 16))
+        # Add location pin
+        heading = train.get("heading", 0)
+        try:
+            heading = float(heading)
+        except (ValueError, TypeError):
+            heading = 0.0
+        
+        # Using Font Awesome icons stacked with custom HTML
+        icon_html = f"""
+        <div style="position: relative; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">
+            <i class="fa-solid fa-location-pin fa-2x" style="color:{line_color}; position: absolute; transform: rotate({heading+180}deg); transform-origin: 50% 37.5%;"></i>
+            <i class="fa-solid fa-train-subway" style="color:white; position: relative; bottom: 3px;"></i>
+        </div>
+        """
 
         folium.Marker(
             location=[offset_latitude, offset_longitude],
-            icon=icon,
+            icon=folium.DivIcon(html=icon_html),
             tooltip=folium.Tooltip(
             f"Direction: {train.get('destNm', '')}<br>"
             f"Next Stop: {train.get('nextStaNm', '')}" if train.get('nextStaNm') else f"Direction: {train.get('destNm', '')}"
@@ -307,7 +301,7 @@ def plotRuns(m, line_details):
 
     return m
 
-def plotTrainLine(m, line_details):
+def plotTrainRoutesAndStations(m, line_details):
 
     # print(f"Plotting {line_details['legend']} geometries on the map...")
 
@@ -318,6 +312,11 @@ def plotTrainLine(m, line_details):
     line_color = line_details['line_color']
     offset_lon = line_details['offset_lon']
     offset_lat = line_details['offset_lat']
+    is_dashed = line_details.get('dashed', False)
+
+    style = {'color': line_color, 'weight': 3}
+    if is_dashed:
+        style['dashArray'] = '5, 10'
 
     if line_geometries:
         for geometry in line_geometries:
@@ -328,14 +327,14 @@ def plotTrainLine(m, line_details):
                 offset_geometry = {'type': 'MultiLineString', 'coordinates': offset_multilinestring}
                 folium.features.GeoJson(
                     offset_geometry,
-                    style_function=lambda x, color=line_color: {'color': color, 'weight': 3}
+                    style_function=lambda x: style
                 ).add_to(line_group) # Add to FeatureGroup
             elif geometry.get('type') == 'LineString':
                 offset_linestring = offset_coordinates(geometry.get('coordinates', []), offset_lon, offset_lat)
                 offset_geometry = {'type': 'LineString', 'coordinates': offset_linestring}
                 folium.features.GeoJson(
                     offset_geometry,
-                    style_function=lambda x, color=line_color: {'color': color, 'weight': 3}
+                    style_function=lambda x: style
                 ).add_to(line_group) # Add to FeatureGroup
         # print(f"{line_details['legend']} geometries added to the {line_details['legend']} FeatureGroup with offset.")
 
@@ -394,34 +393,44 @@ def createCombinedFeatureGroups(m):
 def newMap():
 
     m = folium.Map(location=[41.8781, -87.6298], zoom_start=11, tiles='USGS.USImagery') # OpenStreetMap provides some aerial views, or consider 'Stamen Terrain' or 'Stamen Toner'
+    
+    # Add Font Awesome CSS
+    m.get_root().header.add_child(folium.Element('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer" />'))
+    
+    folium.JavascriptLink('https://unpkg.com/leaflet-rotatedmarker/leaflet.rotatedMarker.js').add_to(m)
+    
     return m
 
 def createCity():
 
     m = newMap()
 
-    getRoutes() # Fetch and process all routes once
-    getStations() # Fetch and process all stations once
+    getTrainRoutes() # Fetch and process all routes once
+    getTrainStations() # Fetch and process all stations once
     
     for line_details in line_colors.values():
-        m = plotTrainLine(m, line_details)
+        m = plotTrainRoutesAndStations(m, line_details)
     
+    return m
+
+def create_map():
+    m = createCity()
+    
+    getTrains()
+
+    for line_details in line_colors.values():
+        m = plotTrains(m, line_details)
+
+    m = createCombinedFeatureGroups(m)
+
+    LayerControl().add_to(m)
     return m
 
 def main():
     
     map_file = "map.html"
     
-    m = createCity()
-    
-    getRuns()
-
-    for line_details in line_colors.values():
-        m = plotRuns(m, line_details)
-
-    m = createCombinedFeatureGroups(m)
-
-    LayerControl().add_to(m)
+    m = create_map()
     m.save(map_file)
     
     # Get absolute path and create a file URL

@@ -6,3 +6,4 @@ requests==2.32.5
 pywebview==6.0
 folium==0.20.0
 sodapy==2.2.0
+Flask==3.0.0
