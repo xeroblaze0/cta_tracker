@@ -14,8 +14,8 @@ DATA_FIELDS = ['rt', 'tmst', 'rn', 'lat', 'lon', 'heading']
 
 # --- Time Configuration ---
 # Set the start and end times for data collection in 24-hour format (HH:MM:SS)
-COLLECTION_START_TIME = "22:06:00"
-COLLECTION_END_TIME = "22:06:20"
+COLLECTION_START_TIME = "03:25:00"
+COLLECTION_END_TIME = "10:35:00"
 SAMPLE_INTERVAL_SECONDS = 10  # Interval between data fetches
 
 def fetch_train_data(api_key, rt):
