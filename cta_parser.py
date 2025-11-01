@@ -1,5 +1,6 @@
 import pandas as pd
 import folium
+import os
 
 from folium.plugins import TimestampedGeoJson
 from folium.features import DivIcon, FeatureGroup, Icon
@@ -9,6 +10,18 @@ RT_PARAMS = {"Red", "Blue", "G", "Brn", "P", "Y", "Pink", "Org"}
 
 def load_cta_history_data(limit=None):
 
+    # Stitch data files before loading
+    data_dir = '/home/user/Projects/cta_tracker/data'
+    output_file = os.path.join(data_dir, 'cta_train_data_full.csv')
+    csv_files = [f for f in os.listdir(data_dir) if f.startswith('cta_train_data_') and f.endswith('.csv') and f != 'cta_train_data_full.csv']
+
+    if csv_files:
+        print(f"Stitching {len(csv_files)} data files...")
+        df_list = [pd.read_csv(os.path.join(data_dir, f)) for f in csv_files]
+        full_df = pd.concat(df_list, ignore_index=True)
+        full_df.to_csv(output_file, index=False)
+        print(f"Successfully stitched files into {output_file}")
+
     # Load the data from the CSV file
     csv_file_path = '/home/user/Projects/cta_tracker/data/cta_train_data_full.csv'
     
@@ -17,14 +30,20 @@ def load_cta_history_data(limit=None):
         # print(trains_df.head())
     except FileNotFoundError:
         print(f"Error: The file {csv_file_path} was not found.")
+        return None
     except Exception as e:
         print(f"An error occurred while reading the CSV file: {e}")
+        return None
+
+    if trains_df.empty:
+        print("No data to process.")
+        return None
 
     train_dataframes = {}
 
     unique_train_numbers = trains_df['rn'].unique()
     unique_train_rts = trains_df['rt'].unique()
-    print(f"Unique train routes in data: {unique_train_rts}")
+    # print(f"Unique train routes in data: {unique_train_rts}")
 
     for train_number in unique_train_numbers:
         train_dataframes[train_number] = trains_df[trains_df['rn'] == train_number]
@@ -93,8 +112,9 @@ def create_new_map():
     return chicago_map
 
 def main():
+    print("Loading CTA train history data and generating map...")
     # Load the CTA train history data
-    cta_history_df = load_cta_history_data(limit=30000)
+    cta_history_df = load_cta_history_data(limit=None)
 
     # Create a new map
     chicago_map = create_new_map()
@@ -104,6 +124,7 @@ def main():
 
     # Save the map to an HTML file
     chicago_map.save("cta_tracker/cta_train_map.html")
+    print("Map has been saved to cta_tracker/cta_train_map.html")
 
 if __name__ == "__main__":
     main()
