@@ -9,14 +9,17 @@ CTA_API_KEY = 'edf3d5c3786946c490b5afceeedaf8da'
 BASE_URL = 'http://lapi.transitchicago.com/api/1.0/ttpositions.aspx'
 # Fields to extract from the API response: tmst (timestamp), rn (run number), 
 # lat (latitude), lon (longitude), and hdg (heading).
-RT_PARAMS = {"Red", "Blue", "G", "Brn", "P", "Y", "Pink", "Org"}
+# RT_PARAMS = {"Red", "Blue", "G", "Brn", "P", "Y", "Pink", "Org"}
+RT_PARAMS = ["G", "Org"]
 DATA_FIELDS = ['rt', 'tmst', 'rn', 'lat', 'lon', 'heading']
 
 # --- Time Configuration ---
 # Set the start and end times for data collection in 24-hour format (HH:MM:SS)
-COLLECTION_START_TIME = "15:25:00"
-COLLECTION_END_TIME = "18:35:00"
-SAMPLE_INTERVAL_SECONDS = 10  # Interval between data fetches
+COLLECTION_DAY = "2025-12-02"
+COLLECTION_START_TIME = "15:30:00"
+COLLECTION_END_TIME = "19:30:00"
+SAMPLE_FREQUENCY = 1  # Frequency of data collection per second
+SAMPLE_INTERVAL = 1 / SAMPLE_FREQUENCY  # Interval between data fetches in seconds
 
 def fetch_train_data(api_key, rt):
     """
@@ -78,9 +81,9 @@ def main():
         print("Please replace 'YOUR_CTA_API_KEY' with your actual CTA API key.")
         return
 
-    now = datetime.now()
-    start_time_str = f"{now.year}-{now.month}-{now.day} {COLLECTION_START_TIME}"
-    end_time_str = f"{now.year}-{now.month}-{now.day} {COLLECTION_END_TIME}"
+    # now = datetime.now()
+    start_time_str = f"{COLLECTION_DAY} {COLLECTION_START_TIME}"
+    end_time_str = f"{COLLECTION_DAY} {COLLECTION_END_TIME}"
 
     start_time = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S')
     end_time = datetime.strptime(end_time_str, '%Y-%m-%d %H:%M:%S')
@@ -109,8 +112,8 @@ def main():
             if not train_data_df.empty:
                 collected_data.extend(train_data_df.to_dict('records'))
         
-        # Wait for 5 seconds before the next fetch
-        time.sleep(SAMPLE_INTERVAL_SECONDS)
+        # Wait for before the next fetch
+        time.sleep(SAMPLE_INTERVAL)
 
         # Save data every hour
         if datetime.now() - last_save_time >= timedelta(hours=1):
